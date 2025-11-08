@@ -1,0 +1,11 @@
+{
+  "dependencies": {
+    "spacekit.js": "^0.1.1"
+  },
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  },
+  "scripts": {
+    "start": "live-server --port=8000 --open=index.html"
+  }
+}
