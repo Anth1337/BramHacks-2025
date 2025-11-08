@@ -1,10 +1,12 @@
-// overlay.js — overlays panels over the full-screen Earth.
+// overlay.js — panels over the full-screen Earth.
 // BASIC: diameter (km), per (years), q (AU), rot_per (h)
-// ADVANCED: everything else. Button label auto-switches. Console height reserved.
+// ADVANCED: the rest. Button label auto-switches.
+// Console: tiny minimize button + size slider; no clipping.
 
 (function () {
   const $ = (id) => document.getElementById(id);
   const nowStamp = () => new Date().toLocaleTimeString();
+  const cssVar = (name, value) => document.documentElement.style.setProperty(name, value);
 
   // 1) Build overlay DOM
   const container = document.getElementById('main-container');
@@ -74,11 +76,13 @@
 
     <!-- BOTTOM: Console -->
     <section id="panel-bottom" class="card console">
-      <div class="row">
+      <div class="row" id="console-header">
         <h3 style="margin:0;">Console</h3>
         <div class="grow"></div>
-        <button id="btn-copy" class="btn ghost">Copy</button>
-        <button id="btn-clear" class="btn ghost">Clear</button>
+        <input id="console-size" class="range" type="range" min="120" max="480" value="240" title="Adjust console height"/>
+        <button id="btn-copy" class="btn ghost" title="Copy logs">Copy</button>
+        <button id="btn-clear" class="btn ghost" title="Clear logs">Clear</button>
+        <button id="btn-min" class="iconbtn" title="Minimize/Restore">–</button>
       </div>
       <div id="console-box" class="console-box">
         <div class="muted s">Console is empty. Actions and results will appear here.</div>
@@ -87,18 +91,83 @@
   `;
   container.appendChild(overlay);
 
-  /* ---------- Layout: prevent console clipping ---------- */
-  const cssVar = (name, value) => document.documentElement.style.setProperty(name, value);
-  function layoutPanels() {
-    const bottom = document.getElementById('panel-bottom');
-    // Clamp console height between 160px and 40% of viewport
-    const desired = Math.max(160, Math.min(bottom.scrollHeight, Math.floor(window.innerHeight * 0.4)));
-    cssVar('--consoleH', desired + 'px');
+  /* ---------- Layout & console sizing ---------- */
+  const consolePanel = $('panel-bottom');
+  const consoleHeader = $('console-header');
+  const consoleBox = $('console-box');
+  const slider = $('console-size');
+  const minBtn = $('btn-min');
+  let isMin = false;
+  let MIN_H = 200; // will be measured
+
+  function computeMinHeight(){
+    // Header height + card padding (16 top + 16 bottom)
+    const headerH = consoleHeader?.offsetHeight || 44;
+    MIN_H = headerH + 32;
+    // Keep slider's minimum in sync
+    slider.min = String(MIN_H);
   }
+
+  function applyHeightFromSlider(){
+    const maxAllowed = Math.floor(window.innerHeight * 0.6);
+    slider.max = String(Math.max(parseInt(slider.min,10)+20, maxAllowed));
+    const val = Math.max(parseInt(slider.min,10), Math.min(maxAllowed, parseInt(slider.value || '240', 10)));
+    slider.value = String(val);
+    cssVar('--consoleH', val + 'px');
+  }
+
+  function setMinimized(state){
+    isMin = state;
+    consolePanel.classList.toggle('min', isMin);
+    if (isMin) {
+      cssVar('--consoleH', MIN_H + 'px');
+      minBtn.textContent = '▢';  // restore icon
+      minBtn.title = 'Restore console';
+    } else {
+      minBtn.textContent = '–';  // minimize icon
+      minBtn.title = 'Minimize console';
+      applyHeightFromSlider();
+    }
+  }
+
+  function layoutPanels(){
+    computeMinHeight();
+    if (isMin) {
+      cssVar('--consoleH', MIN_H + 'px');
+    } else {
+      applyHeightFromSlider();
+    }
+  }
+
   window.addEventListener('resize', layoutPanels);
 
+  // Slider interactions: drag to resize; dragging to min "minimizes"
+  slider.addEventListener('input', () => {
+    const minVal = parseInt(slider.min, 10);
+    const cur = parseInt(slider.value, 10);
+    if (cur <= minVal) {
+      setMinimized(true);
+    } else {
+      if (isMin) setMinimized(false);
+      cssVar('--consoleH', cur + 'px');
+    }
+  });
+
+  // Minimize/restore button
+  minBtn.addEventListener('click', () => {
+    if (isMin) {
+      // restore to slider value (ensure slider isn't at min)
+      const minVal = parseInt(slider.min, 10);
+      if (parseInt(slider.value,10) <= minVal) slider.value = String(Math.max(minVal + 40, 200));
+      setMinimized(false);
+    } else {
+      // snap slider to min and minimize
+      slider.value = slider.min;
+      setMinimized(true);
+    }
+  });
+
   /* ---------- Console helpers ---------- */
-  const consoleBox = $('console-box');
   function appendLog(level, text){
     const line = document.createElement('div');
     line.className = `logline ${level.toLowerCase()}`;
@@ -108,7 +177,8 @@
     }
     consoleBox.appendChild(line);
     consoleBox.scrollTop = consoleBox.scrollHeight;
-    layoutPanels();
+    // Reflow if content changes (only matters when not minimized)
+    if (!isMin) layoutPanels();
   }
   $('btn-copy').addEventListener('click', () => {
     const s = Array.from(consoleBox.querySelectorAll('.logline')).map(l => l.textContent).join('\n');
@@ -116,13 +186,13 @@
   });
   $('btn-clear').addEventListener('click', () => {
     consoleBox.innerHTML = '<div class="muted s">Console is empty. Actions and results will appear here.</div>';
-    layoutPanels();
+    if (!isMin) layoutPanels();
   });
 
-  // Mutation observer: recompute height if logs change size
-  new MutationObserver(layoutPanels).observe(consoleBox, { childList: true, subtree: true });
+  // Reflow when console content changes naturally
+  new MutationObserver(() => { if (!isMin) layoutPanels(); }).observe(consoleBox, { childList: true, subtree: true });
 
-  /* ---------- Near-miss demo list ---------- */
+  /* ---------- Near-miss demo list (unchanged) ---------- */
   const NEAR_EVENTS = [
     { id:'2025-AB', title:'2025 AB', kind:'Near Miss', date:'2025-11-05', distance_AU:0.0031, relVel_kms:18.2, H:22.1,
       params:{ name:'2025 AB', a:1.12, e:0.21, i:5.5, ma:0, per:1.19, n:0.986, H:22.1, albedo:0.23, diameter_km:0.11,
@@ -157,7 +227,7 @@
     nearList.appendChild(item);
   });
 
-  /* ---------- Form logic ---------- */
+  /* ---------- Form logic (unchanged) ---------- */
   const fields = {
     // BASIC
     diameter_km: $('f_diameter'),
@@ -171,23 +241,21 @@
     H: $('f_H'), albedo: $('f_albedo'),
     GM: $('f_gm'), spec_B: $('f_specB'), spec_T: $('f_specT'),
   };
-
   const advancedKeys = ['name','a','e','i','ad','n','ma','H','albedo','GM','spec_B','spec_T'];
 
   function setField(id, value){ if(fields[id]) fields[id].value = value==null ? '' : String(value); }
 
-  // Defaults (basic prefilled; advanced empty)
+  // Defaults
   (function primeDefaults(){
     setField('diameter_km','0.49');
     setField('per','1.0');
     setField('q','0.90');
     setField('rot_per','4.3');
-
-    advancedKeys.forEach(k => setField(k, '')); // clear all advanced
+    advancedKeys.forEach(k => setField(k, ''));
     updateSearchButtonLabel();
   })();
 
-  // Derived q/ad from a & e (q is BASIC; ad is ADVANCED)
+  // Derived q/ad from a & e
   function syncDerived(){
     const a = parseFloat(fields.a?.value);
     const e = parseFloat(fields.e?.value);
@@ -199,32 +267,23 @@
   if (fields.a) fields.a.addEventListener('input', () => { syncDerived(); updateSearchButtonLabel(); });
   if (fields.e) fields.e.addEventListener('input', () => { syncDerived(); updateSearchButtonLabel(); });
 
-  // Button label switches if any advanced field is non-empty
   function isAdvancedUsed(){ return advancedKeys.some(k => fields[k] && fields[k].value.trim() !== ''); }
   function updateSearchButtonLabel(){ $('btn-search').textContent = isAdvancedUsed() ? 'Advanced Search' : 'Basic Search'; }
-
-  // Watch all advanced fields for label updates
   advancedKeys.forEach(k => { if(fields[k]) fields[k].addEventListener('input', updateSearchButtonLabel); });
 
-  // Fill from near-miss item (keeps your prior behavior)
   function fillFromEvent(ev){
-    // Set known BASIC first if present
     if ('diameter_km' in ev.params) setField('diameter_km', ev.params.diameter_km);
     if ('per' in ev.params)        setField('per', ev.params.per);
     if ('q' in ev.params)          setField('q', ev.params.q);
     if ('rot_per' in ev.params)    setField('rot_per', ev.params.rot_per);
-
-    // Then everything else (ADVANCED)
     Object.entries(ev.params).forEach(([k,v]) => {
       if (fields[k] && !['diameter_km','per','q','rot_per'].includes(k)) setField(k, v);
     });
-
     appendLog('INFO', `Loaded parameters from "${ev.title}" (dist ${ev.distance_AU} AU, ${ev.kind}).`);
     syncDerived();
     updateSearchButtonLabel();
   }
 
-  // Advanced toggle (fixed)
   const advBtn = $('btn-advanced');
   const advSection = $('advanced-section');
   let advOpen = false;
@@ -235,7 +294,6 @@
     layoutPanels();
   });
 
-  // Validation: only enforce a/e/i if ADVANCED is used
   function advancedIsValid(){
     if (!isAdvancedUsed()) return true;
     const a = parseFloat(fields.a.value);
@@ -246,7 +304,6 @@
         && (!fields.i.value || (Number.isFinite(i) && i >= 0 && i <= 180));
   }
 
-  // Submit (search)
   function doSearch(){
     const basic = {
       diameter_km: parseFloat(fields.diameter_km.value || '0'),
@@ -260,7 +317,6 @@
     if (usedAdv.length) appendLog('INFO', `Advanced fields used: ${usedAdv.join(', ')}`);
   }
 
-  // Button click
   $('btn-search').addEventListener('click', () => {
     const warn = $('form-warning');
     if (!advancedIsValid()){
@@ -272,6 +328,10 @@
     doSearch();
   });
 
-  // Initial layout pass
-  layoutPanels();
+  // Initial layout
+  computeMinHeight();
+  applyHeightFromSlider();
+  setMinimized(false);
+  // Ensure correct layout on first paint
+  requestAnimationFrame(layoutPanels);
 })();

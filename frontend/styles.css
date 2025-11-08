@@ -1,10 +1,10 @@
 :root{
   --bg:#0A0D13; --panel:#0E1116; --line:#1f2430;
   --text:#E7ECF6; --muted:#96A2BE; --amber:#EFBF44;
-  --accent:#12C2E9; --good:#0b7a1a; --warn:#735c00; --bad:#7a1a1a;
+  --accent:#12C2E9; --good:#0b7a4b; --warn:#735c00; --bad:#7a1a1a;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "JetBrains Mono", monospace;
   --sans: Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans";
-  /* Reserved height for the console; JS updates this live */
+  /* Console height (live-tuned by JS) */
   --consoleH: 240px;
 }
 
@@ -28,6 +28,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans)}
 
 .btn{background:linear-gradient(90deg,var(--accent),#7A87F1);border:none;color:var(--text);padding:10px 12px;border-radius:10px;font-weight:600;cursor:pointer}
 .btn.ghost{background:transparent;border:1px solid #283044}
+.iconbtn{background:transparent;border:1px solid #283044;color:var(--text);padding:6px 8px;border-radius:8px;cursor:pointer;font-size:12px;line-height:1}
 
 .collapse{margin-top:10px;background:transparent;border:1px solid #283044;color:var(--text);padding:8px 10px;border-radius:10px;cursor:pointer;width:100%;text-align:left}
 
@@ -51,14 +52,18 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans)}
 .logline.error .lvl{color:#ff8a8a}
 .error{color:#ff7373;font-size:12px}
 
+/* Slider for console height */
+.range{width:160px;appearance:none;height:4px;background:#233048;border-radius:999px;outline:none}
+.range::-webkit-slider-thumb{appearance:none;width:12px;height:12px;border-radius:50%;background:#cfe3ff;border:1px solid #7a87f1}
+.range::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:#cfe3ff;border:1px solid #7a87f1}
+
 /* === Overlay layout (keeps globe interactive) === */
 #ui-overlay{position:absolute;inset:0;pointer-events:none;z-index:200}
 #panel-left,#panel-right,#panel-bottom{
   pointer-events:auto;background:rgba(14,17,22,0.82);backdrop-filter:blur(6px)
 }
 
-/* Left & Right panels: stretch from top to just above the console.
-   They scroll internally if content becomes tall. */
+/* Left & Right panels: occupy space above the console, scroll internally */
 #panel-left{
   position:absolute; top:20px; left:20px; width:360px;
   bottom:calc(var(--consoleH) + 30px);
@@ -70,12 +75,17 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans)}
   overflow:auto;
 }
 
-/* Console: fixed to bottom; height controlled by --consoleH (clamped by JS) */
+/* Console pinned to bottom */
 #panel-bottom{
   position:absolute; left:20px; right:20px; bottom:20px;
   height:var(--consoleH);
   overflow:auto;
 }
+
+/* Minimized console: only title row + minimize button visible */
+#panel-bottom.min .console-box{display:none}
+#panel-bottom.min .btn.ghost{display:none}         /* hide Copy / Clear */
+#panel-bottom.min .range{display:none}             /* hide slider */
 
 /* Mobile: stack panels; keep everything visible */
 @media (max-width: 900px){
