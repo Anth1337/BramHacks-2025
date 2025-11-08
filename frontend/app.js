@@ -1,5 +1,10 @@
-// Initialize the Spacekit viewer
-const viz = new Spacekit.Simulation(document.getElementById('main-container'), {
+/*
+ * Initialize the Spacekit viewer and display a 3D model of the Earth.
+ * Ensure you have included spacekit.js and its dependencies in your HTML.
+ */
+
+// Initialize the Spacekit viewer (make it global so asteroid.js can access it)
+let viz = new Spacekit.Simulation(document.getElementById('main-container'), {
     basePath: 'https://typpo.github.io/spacekit/src',
     // Enable camera controls
     camera: {
@@ -9,17 +14,13 @@ const viz = new Spacekit.Simulation(document.getElementById('main-container'), {
     // initialCameraPosition: [0, 0, -100],
 });
 
+// Add stars in the background for a more realistic space environment
 viz.createStars();
 
 viz.createSphere('earth', {
-  textureUrl: './earth.jpg',
+  textureUrl: './images/earth.jpg',
+  position: [0, 0, 0],
 });
-
-// Optional: Add stars in the background for a more realistic space environment
 
 // Log when simulation is ready
 console.log('3D Earth model loaded successfully!');
-console.log('Use your mouse to interact with the Earth:');
-console.log('- Left-click and drag: Rotate view');
-console.log('- Scroll wheel: Zoom in/out');
-console.log('- Right-click and drag: Pan view');
