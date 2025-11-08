@@ -16,7 +16,6 @@ viz.createSphere('earth', {
 });
 
 // Optional: Add stars in the background for a more realistic space environment
-viz.createStars();
 
 // Log when simulation is ready
 console.log('3D Earth model loaded successfully!');
