@@ -1,5 +1,6 @@
-// Builds overlay UI (Form One, Near Misses, Console) over the full-screen Earth.
-// Requires: styles.css is linked; app.js already initialized SpaceKit.
+// overlay.js — overlays three panels over the full-screen Earth.
+// Basic fields: diameter, per, q, rot_per. Everything else is Advanced.
+// The main button shows "Basic Search" unless any Advanced field is filled.
 
 (function () {
   const $ = (id) => document.getElementById(id);
@@ -17,32 +18,20 @@
       <div class="subhead">Basic Parameters</div>
       <div class="grid2">
         <label class="field">
-          <div class="lbl">Name / Designation</div>
-          <input id="f_name" class="inp" type="text" />
-        </label>
-        <label class="field">
-          <div class="lbl">Semi-major axis a (AU)</div>
-          <input id="f_a" class="inp" type="text" />
-        </label>
-        <label class="field">
-          <div class="lbl">Eccentricity e</div>
-          <input id="f_e" class="inp" type="text" />
-        </label>
-        <label class="field">
-          <div class="lbl">Inclination i (deg)</div>
-          <input id="f_i" class="inp" type="text" />
-        </label>
-        <label class="field">
-          <div class="lbl">Absolute magnitude H</div>
-          <input id="f_H" class="inp" type="text" />
-        </label>
-        <label class="field">
           <div class="lbl">Diameter (km)</div>
           <input id="f_diameter" class="inp" type="text" />
         </label>
         <label class="field">
-          <div class="lbl">Albedo</div>
-          <input id="f_albedo" class="inp" type="text" />
+          <div class="lbl">Period (years)</div>
+          <input id="f_per" class="inp" type="text" />
+        </label>
+        <label class="field">
+          <div class="lbl">Perihelion q (AU)</div>
+          <input id="f_q" class="inp" type="text" />
+        </label>
+        <label class="field">
+          <div class="lbl">Rotation period (h)</div>
+          <input id="f_rot" class="inp" type="text" />
         </label>
       </div>
 
@@ -51,48 +40,26 @@
       <div id="advanced-section" style="display:none;">
         <div class="subhead">Advanced Parameters</div>
         <div class="grid2">
-          <label class="field">
-            <div class="lbl">Perihelion q (AU)</div>
-            <input id="f_q" class="inp" type="text" />
-          </label>
-          <label class="field">
-            <div class="lbl">Aphelion ad (AU)</div>
-            <input id="f_ad" class="inp" type="text" />
-          </label>
-          <label class="field">
-            <div class="lbl">Period (years)</div>
-            <input id="f_per" class="inp" type="text" />
-          </label>
-          <label class="field">
-            <div class="lbl">Mean motion n (deg/day)</div>
-            <input id="f_n" class="inp" type="text" />
-          </label>
-          <label class="field">
-            <div class="lbl">Mean anomaly ma (deg)</div>
-            <input id="f_ma" class="inp" type="text" />
-          </label>
-          <label class="field">
-            <div class="lbl">Rotation period (h)</div>
-            <input id="f_rot" class="inp" type="text" />
-          </label>
-          <label class="field">
-            <div class="lbl">GM (optional)</div>
-            <input id="f_gm" class="inp" type="text" />
-          </label>
-          <label class="field">
-            <div class="lbl">Spectral (Bus/Tholen)</div>
-            <input id="f_specB" class="inp" type="text" />
-          </label>
-          <label class="field">
-            <div class="lbl">Taxonomic class</div>
-            <input id="f_specT" class="inp" type="text" />
-          </label>
+          <label class="field"><div class="lbl">Name / Designation</div><input id="f_name" class="inp" type="text" /></label>
+          <label class="field"><div class="lbl">Semi-major axis a (AU)</div><input id="f_a" class="inp" type="text" /></label>
+          <label class="field"><div class="lbl">Eccentricity e</div><input id="f_e" class="inp" type="text" /></label>
+          <label class="field"><div class="lbl">Inclination i (deg)</div><input id="f_i" class="inp" type="text" /></label>
+
+          <label class="field"><div class="lbl">Aphelion ad (AU)</div><input id="f_ad" class="inp" type="text" /></label>
+          <label class="field"><div class="lbl">Mean motion n (deg/day)</div><input id="f_n" class="inp" type="text" /></label>
+          <label class="field"><div class="lbl">Mean anomaly ma (deg)</div><input id="f_ma" class="inp" type="text" /></label>
+
+          <label class="field"><div class="lbl">Absolute magnitude H</div><input id="f_H" class="inp" type="text" /></label>
+          <label class="field"><div class="lbl">Albedo</div><input id="f_albedo" class="inp" type="text" /></label>
+          <label class="field"><div class="lbl">GM (optional)</div><input id="f_gm" class="inp" type="text" /></label>
+          <label class="field"><div class="lbl">Spectral (Bus/Tholen)</div><input id="f_specB" class="inp" type="text" /></label>
+          <label class="field"><div class="lbl">Taxonomic class</div><input id="f_specT" class="inp" type="text" /></label>
         </div>
       </div>
 
       <div class="row" style="margin-top:12px;">
-        <button id="btn-predict" class="btn">Predict Yarkovsky (da/dt)</button>
-        <div id="form-warning" class="error" style="display:none;">Check inputs: a&gt;0, 0≤e&lt;1, 0≤i≤180</div>
+        <button id="btn-search" class="btn">Basic Search</button>
+        <div id="form-warning" class="error" style="display:none;">Check inputs: if using a/e/i, a&gt;0, 0≤e&lt;1, 0≤i≤180</div>
       </div>
     </section>
 
@@ -120,7 +87,16 @@
   `;
   container.appendChild(overlay);
 
-  // 2) Console helpers
+  // 2) Keep panels in-viewport (if console height changes, recompute)
+  function layoutPanels(){
+    const bottom = document.getElementById('panel-bottom');
+    const h = Math.max(bottom?.offsetHeight || 0, 200);
+    document.documentElement.style.setProperty('--consoleH', `${h}px`);
+  }
+  window.addEventListener('resize', layoutPanels);
+  setTimeout(layoutPanels, 0);
+
+  // 3) Console helpers
   const consoleBox = $('console-box');
   const appendLog = (level, text) => {
     const line = document.createElement('div');
@@ -138,9 +114,10 @@
   });
   $('btn-clear').addEventListener('click', () => {
     consoleBox.innerHTML = '<div class="muted s">Console is empty. Actions and results will appear here.</div>';
+    layoutPanels();
   });
 
-  // 3) Near-miss demo list
+  // 4) Near-miss demo list (same data)
   const NEAR_EVENTS = [
     { id:'2025-AB', title:'2025 AB', kind:'Near Miss', date:'2025-11-05', distance_AU:0.0031, relVel_kms:18.2, H:22.1,
       params:{ name:'2025 AB', a:1.12, e:0.21, i:5.5, ma:0, per:1.19, n:0.986, H:22.1, albedo:0.23, diameter_km:0.11,
@@ -158,7 +135,6 @@
       params:{ name:'65803 Didymos', a:1.644, e:0.383, i:3.4, ma:0, per:2.11, n:0.468, H:18.2, albedo:0.15, diameter_km:0.78,
                q:1.644*(1-0.383), ad:1.644*(1+0.383), rot_per:2.26, GM:null, spec_B:'Xk', spec_T:'Xk' } },
   ];
-
   const nearList = $('near-list');
   NEAR_EVENTS.forEach((ev) => {
     const item = document.createElement('div');
@@ -176,39 +152,74 @@
     nearList.appendChild(item);
   });
 
-  // 4) Form logic
+  // 5) Form logic
   const fields = {
+    // BASIC
+    diameter_km: $('f_diameter'),
+    per: $('f_per'),
+    q: $('f_q'),
+    rot_per: $('f_rot'),
+    // ADVANCED
     name: $('f_name'),
     a: $('f_a'), e: $('f_e'), i: $('f_i'),
-    H: $('f_H'), diameter_km: $('f_diameter'), albedo: $('f_albedo'),
-    q: $('f_q'), ad: $('f_ad'), per: $('f_per'), n: $('f_n'),
-    ma: $('f_ma'), rot_per: $('f_rot'), GM: $('f_gm'),
-    spec_B: $('f_specB'), spec_T: $('f_specT'),
+    H: $('f_H'), albedo: $('f_albedo'),
+    ad: $('f_ad'), n: $('f_n'), ma: $('f_ma'),
+    GM: $('f_gm'), spec_B: $('f_specB'), spec_T: $('f_specT'),
   };
 
   function setField(id, value){ if(fields[id]) fields[id].value = value==null ? '' : String(value); }
 
-  // defaults
+  // Defaults for a nice starting point
   (function primeDefaults(){
-    setField('a','1.12'); setField('e','0.2'); setField('i','5.0');
-    setField('H','20.2'); setField('diameter_km','0.49'); setField('albedo','0.05');
-    syncDerived();
+    setField('diameter_km','0.49');
+    setField('per','1.0');
+    setField('q','0.9');
+    setField('rot_per','4.3');
+
+    // Advanced left blank by default; when filled they’ll switch button label
+    setField('a',''); setField('e',''); setField('i','');
+    setField('H',''); setField('albedo',''); setField('ad','');
+    setField('n',''); setField('ma',''); setField('GM','');
+    setField('spec_B',''); setField('spec_T','');
+    updateSearchButtonLabel();
   })();
 
+  // If user fills in a/e, we can recompute q/ad (q is BASIC, ad is ADV)
   function syncDerived(){
-    const a = parseFloat(fields.a.value);
-    const e = parseFloat(fields.e.value);
+    const a = parseFloat(fields.a?.value);
+    const e = parseFloat(fields.e?.value);
     if (Number.isFinite(a) && Number.isFinite(e)) {
       setField('q', (a*(1-e)).toString());
       setField('ad',(a*(1+e)).toString());
     }
   }
-  fields.a.addEventListener('input', syncDerived);
-  fields.e.addEventListener('input', syncDerived);
+  if (fields.a) fields.a.addEventListener('input', ()=>{ syncDerived(); updateSearchButtonLabel(); });
+  if (fields.e) fields.e.addEventListener('input', ()=>{ syncDerived(); updateSearchButtonLabel(); });
 
+  // Any advanced input toggles the button label
+  const advancedKeys = ['name','a','e','i','H','albedo','ad','n','ma','GM','spec_B','spec_T'];
+  advancedKeys.forEach(k => { if(fields[k]) fields[k].addEventListener('input', updateSearchButtonLabel); });
+
+  function isAdvancedUsed(){
+    return advancedKeys.some(k => fields[k] && fields[k].value.trim() !== '');
+  }
+  function updateSearchButtonLabel(){
+    $('btn-search').textContent = isAdvancedUsed() ? 'Advanced Search' : 'Basic Search';
+  }
+
+  // Fill from near-miss item
   function fillFromEvent(ev){
-    Object.entries(ev.params).forEach(([k,v]) => setField(k, v));
+    // Basic fields first
+    if (typeof ev.params.diameter_km !== 'undefined') setField('diameter_km', ev.params.diameter_km);
+    if (typeof ev.params.per !== 'undefined')         setField('per', ev.params.per);
+    if (typeof ev.params.q !== 'undefined')           setField('q', ev.params.q);
+    if (typeof ev.params.rot_per !== 'undefined')     setField('rot_per', ev.params.rot_per);
+
+    // Advanced fields next
+    Object.entries(ev.params).forEach(([k,v]) => { if(fields[k] && !['diameter_km','per','q','rot_per'].includes(k)) setField(k, v); });
+
     appendLog('INFO', `Loaded parameters from "${ev.title}" (dist ${ev.distance_AU} AU, ${ev.kind}).`);
+    updateSearchButtonLabel();
     syncDerived();
   }
 
@@ -220,51 +231,60 @@
     advOpen = !advOpen;
     advSection.style.display = advOpen ? 'block' : 'none';
     advBtn.textContent = advOpen ? '▾ Hide Advanced' : '▸ Show Advanced';
+    layoutPanels();
   });
 
-  // Validation
-  function formValid(){
+  // Validation (only if user uses a/e/i in Advanced)
+  function advancedIsValid(){
+    if (!isAdvancedUsed()) return true; // no advanced → valid
     const a = parseFloat(fields.a.value);
     const e = parseFloat(fields.e.value);
     const i = parseFloat(fields.i.value);
-    return Number.isFinite(a) && a>0 && Number.isFinite(e) && e>=0 && e<1 && Number.isFinite(i) && i>=0 && i<=180;
+    return (!fields.a.value || (Number.isFinite(a) && a>0))
+        && (!fields.e.value || (Number.isFinite(e) && e>=0 && e<1))
+        && (!fields.i.value || (Number.isFinite(i) && i>=0 && i<=180));
   }
 
-  // Demo predictor (mock)
-  async function mockPredict(params){
-    const mean = -2.2e-4; const conf = 0.72; const span = Math.abs(mean)*0.35;
-    return new Promise(r=>setTimeout(()=>r({da_dt:mean, ci_low:mean-span, ci_high:mean+span, confidence:conf}), 400));
+  // Mock “search”
+  function doSearch(){
+    const basic = {
+      diameter_km: parseFloat(fields.diameter_km.value || '0'),
+      per:         parseFloat(fields.per.value || '0'),
+      q:           parseFloat(fields.q.value || '0'),
+      rot_per:     fields.rot_per.value === '' ? null : parseFloat(fields.rot_per.value),
+    };
+    const adv = Object.fromEntries(advancedKeys.map(k => [k, fields[k]?.value ?? '']));
+    const mode = isAdvancedUsed() ? 'Advanced' : 'Basic';
+    appendLog('INFO', `${mode} Search submitted.`);
+    appendLog('INFO', `Basic={diameter:${basic.diameter_km}, per:${basic.per}, q:${basic.q}, rot_per:${basic.rot_per}}`);
+    if (mode === 'Advanced') {
+      appendLog('INFO', `Advanced fields used: ${advancedKeys.filter(k => (fields[k]?.value||'').trim() !== '').join(', ') || '(none)'}`);
+    }
   }
 
-  // Predict click
-  $('btn-predict').addEventListener('click', async () => {
+  // Button click
+  $('btn-search').addEventListener('click', () => {
     const warn = $('form-warning');
-    if (!formValid()){
+    if (!advancedIsValid()){
       warn.style.display = 'block';
-      appendLog('WARN','Cannot predict: invalid orbital parameters (check a, e, i).');
+      appendLog('WARN','Advanced fields invalid (if used): require a>0, 0≤e<1, 0≤i≤180.');
       return;
     }
     warn.style.display = 'none';
-    appendLog('INFO','Predicting Yarkovsky drift (demo)...');
-
-    const params = {
-      a: parseFloat(fields.a.value), e: parseFloat(fields.e.value), i: parseFloat(fields.i.value),
-      ma: parseFloat(fields.ma?.value||'0'),
-      H: parseFloat(fields.H?.value||'0'),
-      albedo: parseFloat(fields.albedo?.value||'0'),
-      diameter_km: parseFloat(fields.diameter_km?.value||'0'),
-      rot_per: fields.rot_per?.value==='' ? null : parseFloat(fields.rot_per?.value),
-      spec_B: fields.spec_B?.value||'', spec_T: fields.spec_T?.value||'',
-    };
-
-    try{
-      const out = await mockPredict(params);
-      const sci = (x)=> (x==null || !isFinite(x) ? '—' : Number(x).toExponential(2).replace('e','×10^'));
-      appendLog('INFO', `da/dt = ${sci(out.da_dt)} AU/My (90% CI ${sci(out.ci_low)}–${sci(out.ci_high)}; conf ${Math.round((out.confidence||0)*100)}%).`);
-      appendLog('INFO','No impact risk is assessed by this demo (visualization only).');
-    }catch(err){
-      appendLog('ERROR','Prediction failed. See console for details.'); console.error(err);
-    }
+    doSearch();
   });
 
+  // Console utils
+  function appendLog(level, text){
+    const box = $('console-box');
+    const line = document.createElement('div');
+    line.className = `logline ${level.toLowerCase()}`;
+    line.innerHTML = `<span class="ts">[${nowStamp()}]</span> <span class="lvl">${level}</span> ${text}`;
+    if (box.firstElementChild && box.firstElementChild.classList.contains('muted')) box.innerHTML = '';
+    box.appendChild(line);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  // Initial layout
+  layoutPanels();
 })();
