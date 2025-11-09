@@ -16,7 +16,7 @@
       <div class="subhead">Target & Launch (auto)</div>
       <div class="field">
         <label>Asteroid</label>
-        <select id="mp_target" class="inp"></select>
+        <input id="mp_target" class="inp" type="text" readonly style="cursor:default;" value="Loading..." />
       </div>
 
       <div class="subhead">Launch Site (lat/lon)</div>
@@ -67,30 +67,53 @@
   `;
   container.appendChild(overlay);
 
-  // Sample targets (kept inline so the overlay is self-contained). Later we can load from asteroidData.js
-  // Load targets from the local asteroid database (asteroidData.js)
-  let TARGETS = [];
-  if (typeof asteroidDatabase !== 'undefined' && Array.isArray(asteroidDatabase)) {
-    TARGETS = asteroidDatabase.map((rec) => ({
-      id: String(rec.id),
-      name: rec.name,
-      // prefer ephem values when available
-      a: rec.ephem && rec.ephem.a ? rec.ephem.a : (rec.a || null),
-      e: rec.ephem && rec.ephem.e ? rec.ephem.e : (rec.e || null),
-      i: rec.ephem && rec.ephem.i ? rec.ephem.i : (rec.i || null),
-      // diameter in DB is meters for many entries — convert to km
-      diameter_km: rec.diameter ? Number(rec.diameter) / 1000 : (rec.diameter_km || 0),
-      composition: rec.composition || 'unknown',
-      ephem: rec.ephem || null,
-    }));
-  } else {
-    // fallback: empty array
-    TARGETS = [];
+  // Load the selected asteroid from localStorage (set by selection page)
+  let selectedAsteroid = null;
+  
+  function loadSelectedAsteroid() {
+    try {
+      const storedData = localStorage.getItem('selectedAsteroid');
+      if (storedData) {
+        selectedAsteroid = JSON.parse(storedData);
+        console.log('Loaded selected asteroid from localStorage:', selectedAsteroid);
+        
+        // Update the display
+        const targetInput = $('mp_target');
+        if (selectedAsteroid) {
+          targetInput.value = selectedAsteroid.name || 'Unknown Asteroid';
+        } else {
+          targetInput.value = 'No asteroid selected';
+        }
+        
+        // Update asteroid info panel
+        showAsteroidInfo();
+      }
+    } catch (error) {
+      console.error('Failed to load selected asteroid from localStorage:', error);
+    }
   }
-
-  const sel = $('mp_target');
-  TARGETS.forEach(t => {
-    const opt = document.createElement('option'); opt.value = t.id; opt.textContent = t.name; sel.appendChild(opt);
+  
+  // Initial load
+  loadSelectedAsteroid();
+  
+  // Listen for custom asteroid selection event (dispatched from selection page)
+  window.addEventListener('asteroidSelected', (e) => {
+    console.log('Asteroid selected event received:', e.detail);
+    loadSelectedAsteroid();
+  });
+  
+  // Listen for storage changes (when asteroid is selected from another page/tab)
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'selectedAsteroid') {
+      console.log('Detected asteroid selection change');
+      loadSelectedAsteroid();
+    }
+  });
+  
+  // Also check when window gains focus (covers same-tab navigation)
+  window.addEventListener('focus', () => {
+    console.log('Window focused, checking for asteroid updates');
+    loadSelectedAsteroid();
   });
 
   const resultsHistory = $('results_history');
@@ -108,19 +131,41 @@
   });
 
   // Display selected asteroid properties
-  function showAsteroidInfo(id){
-    const t = TARGETS.find(x=>x.id===id);
+  function showAsteroidInfo(){
+    const t = selectedAsteroid;
     const table = $('ai_table');
-    if (!t){ table.innerHTML=''; $('ai_name').textContent='Select an asteroid to see properties'; return; }
+    if (!t){ 
+      table.innerHTML=''; 
+      $('ai_name').textContent='No asteroid selected'; 
+      return; 
+    }
     $('ai_name').textContent = t.name;
     const epoch = t.ephem && t.ephem.epoch ? t.ephem.epoch : 'n/a';
     const ma = t.ephem && (t.ephem.ma !== undefined) ? t.ephem.ma : 'n/a';
+    const a = t.ephem && t.ephem.a ? t.ephem.a : (t.orbitRadius || 'n/a');
+    const e = t.ephem && t.ephem.e ? t.ephem.e : 'n/a';
+    const i = t.ephem && t.ephem.i ? t.ephem.i : 'n/a';
+    
     table.innerHTML = `
-      <div class="muted">Diameter: ${t.diameter_km} km</div>
-      <div class="muted">a: ${t.a} AU • e: ${t.e} • i: ${t.i}°</div>
+      <div class="muted">Diameter: ${t.diameter_km ? t.diameter_km.toFixed(3) : 'n/a'} km</div>
+      <div class="muted">a: ${a} AU • e: ${e} • i: ${i}°</div>
       <div class="muted">Epoch: ${epoch} • Mean anomaly (ma): ${ma}°</div>
-      <div class="muted">Composition: ${t.composition}</div>
+      <div class="muted">Composition: ${t.composition || 'unknown'}</div>
+      <div class="muted">Weight: ${formatWeight(t.weight || 0)}</div>
+      <div class="muted">Magnitude (H): ${t.magnitude || 'n/a'}</div>
+      <div class="muted">Distance (MOID): ${t.distance || 'n/a'}</div>
     `;
+  }
+  
+  // Format weight for display
+  function formatWeight(weight) {
+    if (weight >= 1000000) {
+      return `${(weight / 1000000).toFixed(1)}M tons`;
+    } else if (weight >= 1000) {
+      return `${(weight / 1000).toFixed(1)}K tons`;
+    } else {
+      return `${weight.toFixed(0)} tons`;
+    }
   }
 
   // Simple Hohmann estimator (heliocentric circular approx). Returns {dv_kms, t_days}
@@ -251,43 +296,56 @@
 
   // Compute button handler
   $('mp_compute').addEventListener('click', async () => {
-    const targetId = sel.value;
-    const t = TARGETS.find(x=>x.id===targetId);
-    if (!t) { appendLog('No target selected'); return; }
-    appendLog(`Computing Hohmann estimate to ${t.name} (a=${t.a} AU)`);
-    const res = hohmannFromEarth(t.a);
+    const t = selectedAsteroid;
+    if (!t) { 
+      appendLog('No asteroid selected'); 
+      alert('Please select an asteroid from the selection page first.');
+      return; 
+    }
+    
+    // Get orbital parameters from ephem if available
+    const a = t.ephem && t.ephem.a ? t.ephem.a : t.orbitRadius;
+    const e = t.ephem && t.ephem.e ? t.ephem.e : 0;
+    const i = t.ephem && t.ephem.i ? t.ephem.i : 0;
+    
+    if (!a || a <= 0) {
+      appendLog('Invalid orbital parameters for this asteroid');
+      return;
+    }
+    
+    appendLog(`Computing Hohmann estimate to ${t.name} (a=${a} AU)`);
+    const res = hohmannFromEarth(a);
     // ideal launch date estimate
-    const est = estimateLaunchEpoch(t.a);
+    const est = estimateLaunchEpoch(a);
     const ld = est.launchDate.toISOString().replace('T', ' ').slice(0,19) + ' UTC';
     const wait_days = Math.round(est.wait_years * 365.25);
 
-  // mission metrics
-  const metrics = missionMetrics(t.a, res.dv_kms, t.i, t.diameter_km, parseFloat($('mp_payload').value || '1000'));
-  const yark = await yarkovskyEstimateYears(t, 0.01);
+    // mission metrics
+    const metrics = missionMetrics(a, res.dv_kms, i, t.diameter_km || 0, parseFloat($('mp_payload').value || '1000'));
+    
+    // Prepare asteroid object for Yarkovsky calculation
+    const asteroidForYark = {
+      diameter_km: t.diameter_km || 0,
+      H: t.magnitude,
+      a: a,
+      e: e,
+      composition: t.composition || 'unknown'
+    };
+    const yark = await yarkovskyEstimateYears(asteroidForYark, 0.01);
 
-  // Populate results panel
-  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-  set('res_dv', res.dv_kms);
-  set('res_transfer', res.t_days);
-  set('res_launch', `${ld} (in ~${wait_days} days)`);
-  set('res_success', `${metrics.successPct}%`);
-  set('res_difficulty', metrics.difficulty);
-  set('res_composition', t.composition || 'unknown');
-  set('res_yark', (yark.rate_AU_per_year).toExponential(2) + ' AU/yr');
-  set('res_yark_years', Math.round(yark.years).toLocaleString());
+    // Populate results panel
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('res_dv', res.dv_kms);
+    set('res_transfer', res.t_days);
+    set('res_launch', `${ld} (in ~${wait_days} days)`);
+    set('res_success', `${metrics.successPct}%`);
+    set('res_difficulty', metrics.difficulty);
+    set('res_composition', t.composition || 'unknown');
+    set('res_yark', (yark.rate_AU_per_year).toExponential(2) + ' AU/yr');
+    set('res_yark_years', Math.round(yark.years).toLocaleString());
 
-  appendLog(`Estimate: Δv ${res.dv_kms} km/s, one-way ${res.t_days} days; ideal launch ${ld}`);
+    appendLog(`Estimate: Δv ${res.dv_kms} km/s, one-way ${res.t_days} days; ideal launch ${ld}`);
   });
-
-  // When user selects asteroid, update info
-  sel.addEventListener('change', (e) => showAsteroidInfo(e.target.value));
-  // show default
-  if (sel.options && sel.options.length) {
-    const startId = sel.value || sel.options[0].value;
-    showAsteroidInfo(startId);
-  } else {
-    showAsteroidInfo(null);
-  }
 
   // Styling/layout helpers are intentionally minimal — the project provides CSS.
 })();
