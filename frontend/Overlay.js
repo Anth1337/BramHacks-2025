@@ -202,21 +202,55 @@
     return { successPct, difficulty };
   }
 
-  // Yarkovsky lifetime estimate (very rough heuristic):
-  // - We estimate drift in semi-major axis per year as inversely proportional to size.
-  // - This is a coarse, order-of-magnitude heuristic. Real Yarkovsky calculations
-  //   require thermal properties, spin state, obliquity, and shape.
-  function yarkovskyEstimateYears(diameter_km, threshold_au=0.01){
-    // base: 1e-4 AU per Myr for a 100m (0.1 km) object (order-of-magnitude)
-    const base_AU_per_Myr_for_0_1km = 1e-4;
-    const rate_AU_per_Myr = base_AU_per_Myr_for_0_1km * (0.1 / Math.max(0.01, diameter_km));
-    const rate_AU_per_year = rate_AU_per_Myr / 1e6;
-    const years = Math.abs(threshold_au / rate_AU_per_year);
-    return { rate_AU_per_year, years };
+  // Yarkovsky lifetime estimate using the ML-based prediction endpoint:
+  // - Calls the FastAPI /predict endpoint with asteroid parameters
+  // - Uses the returned da/dt (in AU/Myr) to estimate orbital drift timeline
+  async function yarkovskyEstimateYears(asteroid, threshold_au=0.01){
+    try {
+      // Prepare payload for the API
+      // H (absolute magnitude) can be estimated from diameter if not available
+      // H = 5 * log10(1329/D/sqrt(pv)) where pv ~ 0.14 for unknown
+      const D_km = asteroid.diameter_km;
+      const H = asteroid.H || (5 * Math.log10(1329 / D_km / Math.sqrt(0.14)));
+      
+      const payload = {
+        H: H,
+        a: asteroid.a,
+        e: asteroid.e,
+        Tax: asteroid.composition || "UNKNOWN",
+        D_km: D_km
+      };
+
+      const response = await fetch('http://localhost:8080/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      // data.da_dt is in AU/Myr
+      const rate_AU_per_Myr = Math.abs(data.da_dt);
+      const rate_AU_per_year = rate_AU_per_Myr / 1e6;
+      const years = Math.abs(threshold_au / rate_AU_per_year);
+      
+      return { rate_AU_per_year, years };
+    } catch (error) {
+      console.error('Yarkovsky API call failed, falling back to heuristic:', error);
+      // Fallback to simple heuristic if API fails
+      const base_AU_per_Myr_for_0_1km = 1e-4;
+      const rate_AU_per_Myr = base_AU_per_Myr_for_0_1km * (0.1 / Math.max(0.01, asteroid.diameter_km));
+      const rate_AU_per_year = rate_AU_per_Myr / 1e6;
+      const years = Math.abs(threshold_au / rate_AU_per_year);
+      return { rate_AU_per_year, years };
+    }
   }
 
   // Compute button handler
-  $('mp_compute').addEventListener('click', () => {
+  $('mp_compute').addEventListener('click', async () => {
     const targetId = sel.value;
     const t = TARGETS.find(x=>x.id===targetId);
     if (!t) { appendLog('No target selected'); return; }
@@ -229,7 +263,7 @@
 
   // mission metrics
   const metrics = missionMetrics(t.a, res.dv_kms, t.i, t.diameter_km, parseFloat($('mp_payload').value || '1000'));
-  const yark = yarkovskyEstimateYears(t.diameter_km, 0.01);
+  const yark = await yarkovskyEstimateYears(t, 0.01);
 
   // Populate results panel
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
