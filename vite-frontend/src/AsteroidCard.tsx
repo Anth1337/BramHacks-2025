@@ -1,19 +1,29 @@
 import type { FC } from "react";
 import type { Asteroid } from "./Home";
+import { useNavigate } from "react-router-dom";
 
 const AsteroidCard: FC<{ asteroid: Asteroid }> = ({ asteroid }) =>
 {
-    return (
-        <div className="asteroid-card" style={{
-            background: "#0b0b0b",
-            border: "1px solid #222",
-            padding: "12px",
-            borderRadius: "6px",
-            color: "#fff",
-            minWidth: "220px",
+    const navigate = useNavigate();
 
-            textAlign: "left"
-        }}>
+    const onCardClick = () =>
+    {
+        navigate(`/asteroid/${asteroid.spkid}`);
+    }
+
+    return (
+        <div className="asteroid-card"
+            onClick={() => onCardClick()}
+            style={{
+                background: "#0b0b0b",
+                border: "1px solid #222",
+                padding: "12px",
+                borderRadius: "6px",
+                color: "#fff",
+                minWidth: "220px",
+
+                textAlign: "left"
+            }}>
             <h3 style={{ margin: "0 0 8px 0", fontSize: "16px" }}>{asteroid.full_name}</h3>
             <table>
                 <tbody>

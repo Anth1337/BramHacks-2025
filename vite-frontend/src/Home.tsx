@@ -4,6 +4,7 @@ import AsteroidGrid from "./AsteroidGrid";
 
 export type Asteroid = {
     full_name: string;
+    spkid: number;
     epoch: number;
     a: number;
     e: number;

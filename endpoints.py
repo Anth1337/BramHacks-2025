@@ -109,7 +109,7 @@ def get_asteroids(page: int = 0, page_size: int = 20):
     Workaround for CORS
     """
     params = {
-        "fields":"full_name,epoch,a,e,i,om,w,ma,H,moid",
+        "fields":"full_name,spkid,epoch,a,e,i,om,w,ma,H,moid",
         "sb-kind":"a",
         "limit":page_size,
         "limit-from": page * page_size
@@ -128,3 +128,31 @@ def get_asteroids(page: int = 0, page_size: int = 20):
         asteroids.append(asteroid)
     
     return {"asteroids": asteroids}
+
+
+# --- Helpers for the frontend ---
+@app.get("/asteroid/{spkid}")
+def get_asteroid(spkid: str):
+    """
+    Gets a list of asteroids from NASA JPL Small-Body Database.
+    Workaround for CORS
+    """
+    params = {
+        "sstr": spkid,
+        "phys-par": 1  # Essential to get physical properties
+    }
+    response = requests.get(
+        "https://ssd-api.jpl.nasa.gov/sbdb.api",
+        params=params
+        )
+    
+    # fields = response.json().get("fields", [])
+    # values = response.json().get("data", [])
+    
+    # asteroids = []
+    # for v in values:
+    #     v = [str(x).strip() if isinstance(x, str) else x for x in v]
+    #     asteroid = dict(zip(fields, v))
+    #     asteroids.append(asteroid)
+    
+    return { "asteroid": response.json()}
