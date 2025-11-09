@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asteroid Selection - YarkNet</title>
+    <link rel="stylesheet" href="selection.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>YarkNet - Notable Asteroids</h1>
+            <p class="subtitle">Select an asteroid to visualize its orbit around Earth</p>
+        </header>
+
+        <div class="controls">
+            <label for="sort-select">Sort by:</label>
+            <select id="sort-select">
+                <option value="name">Name</option>
+                <option value="weight">Weight</option>
+                <option value="diameter">Diameter</option>
+                <option value="orbitRadius">Orbit Radius</option>
+                <option value="date">Date</option>
+            </select>
+        </div>
+
+        <div id="asteroid-grid" class="asteroid-grid">
+            <!-- Asteroid tiles will be dynamically generated here -->
+        </div>
+    </div>
+
+    <script src="asteroidData.js"></script>
+    <script src="selection.js"></script>
+</body>
+</html>

@@ -7,31 +7,75 @@
 
   <!-- UI styles for overlay panels -->
   <link rel="stylesheet" href="styles.css"/>
+  <link rel="stylesheet" href="selection.css"/>
 
   <style>
     body { margin:0; padding:0; overflow:hidden; background:#000; font-family:Arial, sans-serif; }
-    #main-container { width:100vw; height:100vh; position:relative; }
+    #main-container { width:100vw; height:100vh; position:relative; display:none; }
     #info-panel {
       position:absolute; top:20px; left:20px; color:#fff;
       background:rgba(0,0,0,0.7); padding:15px; border-radius:5px; z-index:100;
     }
     h1 { margin:0 0 10px 0; font-size:24px; }
     p { margin:5px 0; font-size:14px; }
+    
+    /* Selection page container */
+    #selection-page {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      overflow-y: auto;
+    }
+    
+    /* Hide visualization initially */
+    .visualization-hidden {
+      display: none !important;
+    }
   </style>
 </head>
 <body>
+  <!-- Selection Page (shown first) -->
+  <div id="selection-page">
+    <div class="container">
+      <header>
+        <h1>YarkNet - Notable Asteroids</h1>
+        <p class="subtitle">Select an asteroid to visualize its orbit around Earth</p>
+      </header>
+
+      <div class="controls">
+        <label for="sort-select">Sort by:</label>
+        <select id="sort-select">
+          <option value="name">Name</option>
+          <option value="weight">Weight</option>
+          <option value="diameter">Diameter</option>
+          <option value="orbitRadius">Orbit Radius</option>
+          <option value="date">Date</option>
+        </select>
+      </div>
+
+      <div id="asteroid-grid" class="asteroid-grid">
+        <!-- Asteroid tiles will be dynamically generated here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 3D Visualization Page (hidden initially) -->
   <div id="main-container"></div>
 
-  <!-- SpaceKit + your scene (unchanged) -->
+  <!-- Load asteroid database first -->
+  <script src="asteroidData.js"></script>
+  
+  <!-- SpaceKit + your scene -->
   <script src="https://typpo.github.io/spacekit/build/spacekit.js"></script>
+  
+  <!-- Selection page logic -->
+  <script src="selection.js"></script>
+  
+  <!-- 3D scene (will load after selection) -->
   <script src="app.js"></script>
+  <script src="asteroid.js"></script>
 
   <!-- Overlay UI (forms, near-misses, console) -->
   <script src="Overlay.js"></script>
-  
-  <!-- Load spacekit.js from CDN -->
-  <script src="https://typpo.github.io/spacekit/build/spacekit.js"></script>
-  <script src="app.js"></script>
-  <script src="asteroid.js"></script>
 </body>
 </html>
