@@ -1,6 +1,22 @@
 /**
  * Local database of notable asteroids
  */
+const getAsteroidData = async (page = 0) =>
+{
+    const pageSize = 20;
+
+    const baseUrl = new URL("http://localhost:8000/asteroids")
+
+    const init = {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json',
+        },
+    }
+    const res = await fetch(baseUrl, init);
+    const data = await res.json();
+    return data;
+}
 
 const asteroidDatabase = [
     {
@@ -116,6 +132,7 @@ const asteroidDatabase = [
 ];
 
 // Export for use in other files
-if (typeof module !== 'undefined' && module.exports) {
+if (typeof module !== 'undefined' && module.exports)
+{
     module.exports = asteroidDatabase;
 }

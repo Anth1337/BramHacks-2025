@@ -1,5 +1,7 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import requests
 import joblib, numpy as np
 
 # --- Load your saved model and calibration constants ---
@@ -12,6 +14,13 @@ pv_priors = {"C":0.06,"S":0.23,"V":0.30,"D":0.04,"X":0.12,"UNKNOWN":0.14}
 p_retro_default = 0.67
 
 app = FastAPI(title="Yarkovsky Drift Predictor")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class AsteroidInput(BaseModel):
     H: float
@@ -90,3 +99,32 @@ def batch_predict(batch: BatchInput):
             "units": "au/Myr"
         })
     return {"count": len(results), "results": results}
+
+
+# --- Helpers for the frontend ---
+@app.get("/asteroids")
+def get_asteroids(page: int = 0, page_size: int = 20):
+    """
+    Gets a list of asteroids from NASA JPL Small-Body Database.
+    Workaround for CORS
+    """
+    params = {
+        "fields":"full_name,epoch,a,e,i,om,w,ma,H,moid",
+        "sb-kind":"a",
+        "limit":page_size,
+        "limit-from": page * page_size
+    }
+    response = requests.get(
+        "https://ssd-api.jpl.nasa.gov/sbdb_query.api",
+        params=params
+        )
+    fields = response.json().get("fields", [])
+    values = response.json().get("data", [])
+    
+    asteroids = []
+    for v in values:
+        v = [str(x).strip() if isinstance(x, str) else x for x in v]
+        asteroid = dict(zip(fields, v))
+        asteroids.append(asteroid)
+    
+    return {"asteroids": asteroids}
