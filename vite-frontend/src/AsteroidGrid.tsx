@@ -11,8 +11,7 @@ const AsteroidGrid = (props: {}) =>
     const pageSize = 20;
     const [page, setPage] = useState(0);
     const total = asteroids.length;
-    // const totalPages = Math.max(1, Math.ceil(total / pageSize));
-    const totalPages = 461527;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
     const start = page * pageSize;
     const end = start + pageSize;
@@ -26,11 +25,11 @@ const AsteroidGrid = (props: {}) =>
     {
         const fetchAsteroids = async () =>
         {
-            const res = await getAsteroids(page);
+            const res = await getAsteroids();
             setAsteroids(res.asteroids);
         };
         fetchAsteroids();
-    }, [, page]);
+    }, []);
 
     return (
         <div style={{ color: "#fff" }}>
